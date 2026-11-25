@@ -57,7 +57,10 @@ export async function syncNow() {
       body: JSON.stringify(getDoc()),
     });
     if (res.status === 401) throw new Error('Sync token was rejected – check it in Settings');
-    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Server error ${res.status}`);
+    }
     mergeRemote(await res.json());
     saveSettings({ lastSyncedAt: new Date().toISOString() });
     setStatus('synced', 'All changes synced');

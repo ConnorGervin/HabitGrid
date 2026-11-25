@@ -24,19 +24,21 @@ const headers = (token) => ({
 });
 
 // Retries transient GitHub failures (5xx, 429, network errors) with short backoff.
-async function fetchWithRetry(url, options, attempts = 3) {
+async function fetchWithRetry(url, options, attempts = 4) {
   let lastStatus = 'network error';
   for (let i = 0; i < attempts; i++) {
     try {
       const res = await fetch(url, options);
-      if (res.status < 500 && res.status !== 429) return res;
+      // 5xx, 429, and GitHub's rate limits (403 with Retry-After) are worth retrying.
+      const rateLimited = res.status === 403 && res.headers.get('retry-after');
+      if (res.status < 500 && res.status !== 429 && !rateLimited) return res;
       lastStatus = res.status;
     } catch (err) {
       lastStatus = err.message;
     }
-    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 300 * 2 ** i));
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 500 * 2 ** i));
   }
-  throw httpError(503, `GitHub unavailable after ${attempts} tries (${lastStatus})`);
+  throw httpError(503, `GitHub is temporarily unavailable (last status: ${lastStatus}). Your changes are saved on this device and will sync automatically.`);
 }
 
 export async function readJson(path, fallback) {
