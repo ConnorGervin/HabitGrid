@@ -1,137 +1,75 @@
 # HabitGrid
 
+A simple weekly habit grid. Habits are rows, days are columns. Tick a box, move between weeks.
 
-A modern, grid-based habit tracker app inspired by GitHub contribution graphs. Track your daily habits, visualize progress, and build streaks with a beautiful, responsive UI.
+- **Installable PWA**: add it to your Android home screen or install it on desktop. It opens and works offline.
+- **Offline-first**: every change is saved on the device first, then synced when you're back online.
+- **Plain JSON**: all data is one human-readable file (`habits.json`) in a private GitHub repo you own. Download a copy any time from Settings.
+- **Reminders**: optional Web Push notification per habit, at a time you choose.
+- **Free to run**: Vercel Hobby, GitHub private repo, and a free cron service. No credit card.
 
----
+Forked from [nagaoo0/HabitGrid](https://github.com/nagaoo0/HabitGrid) and rebuilt around a single JSON document. The Supabase and Git-integration code has been removed.
 
-<p align="center">
-  <a href="https://github.com/nagaoo0/HabitGrid" target="_blank"><img src="https://img.shields.io/github/stars/nagaoo0/HabitGrid?style=social" alt="GitHub stars"></a>
-  <a href="https://github.com/nagaoo0/HabitGrid" target="_blank"><img src="https://img.shields.io/github/license/nagaoo0/HabitGrid?color=blue" alt="MIT License"></a>
-  <a href="https://git.mihajlociric.com/count0/HabitGrid" target="_blank"><img src="https://img.shields.io/badge/Mirror-git.mihajlociric.com-orange?logo=gitea" alt="Gitea Mirror"></a>
-</p>
+## How it fits together
 
----
+```
+Phone / desktop (PWA)  ──PUT /api/data──►  Vercel function  ──Contents API──►  private GitHub repo
+  localStorage (offline)  ◄── merged ──      merges + validates                 habits.json (history = backups)
+                                                                                push.json (reminder devices)
+cron-job.org (free) ──every 15 min──► /api/cron/remind ──Web Push──► Android / desktop Chrome
+```
 
-**Source code:**
+- Data lives in **your** private data repo, not in this code repo.
+- Merging is per record: habits by id, checks by (habit, date), newest edit wins, deletions are kept as tombstones. Two devices edited offline? Nothing gets lost.
 
-- [GitHub Repository](https://github.com/nagaoo0/HabitGrid)
-- [Self-hosted Mirror (Gitea)](https://git.mihajlociric.com/count0/HabitGrid)
+## One-time setup (about 20 minutes, all free)
 
+1. **Fork or clone this repo** and push it to GitHub. Make it public or private, either is fine.
+2. **Create a private data repo**, e.g. `habitgrid-data`. Leave it empty. Its commits are your backup history.
+3. **Create a GitHub token**: Settings → Developer settings → Fine-grained tokens. Limit it to the data repo, with *Contents: Read and write*. Keep it for step 5.
+4. **Generate VAPID keys** for notifications (run locally):
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+5. **Deploy to Vercel**: New Project → import the repo. Framework preset: Vite. Add these environment variables (see `.env.example`):
 
+   | Variable | Value |
+   |---|---|
+   | `VITE_VAPID_PUBLIC_KEY` | public VAPID key |
+   | `SYNC_TOKEN` | a long random string (`openssl rand -hex 32`) |
+   | `GITHUB_TOKEN` | the fine-grained token from step 3 |
+   | `GITHUB_DATA_REPO` | `your-name/habitgrid-data` |
+   | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | the VAPID pair |
+   | `VAPID_SUBJECT` | `mailto:you@example.com` (your own address) |
+   | `CRON_SECRET` | another long random string |
 
-## Features
-- GitHub-style habit grid (calendar view)
-- Streak tracking and personal bests
-- Custom habit colors
-- Dark mode and light mode
-- Data export/import (JSON backup)
-- Responsive design (desktop & mobile)
-- **Cross-device sync with Supabase (cloud save)**
-- **Offline-first:** works fully without login, syncs local habits to cloud on login
-- Built with React, Vite, Tailwind CSS, Radix UI, and Framer Motion
+   Deploy. Then redeploy once so `VITE_` variables are included in the build.
+6. **Schedule reminders** with [cron-job.org](https://cron-job.org) (free, no card). Create a job:
+   - URL: `https://<your-app>.vercel.app/api/cron/remind`
+   - Schedule: every 15 minutes
+   - Header: `Authorization: Bearer <CRON_SECRET>`
+7. **Set up each device**: open the site, go to **Settings**, paste `SYNC_TOKEN`, then (optional) turn on **Reminders**.
+   - **Android**: open in Chrome → menu → *Add to Home screen* (or *Install app*).
+   - **Desktop**: Chrome or Edge → install icon in the address bar.
 
----
+## Backup, export and portability
 
+- **Settings → Download JSON** saves a copy. **Import JSON** merges one in. Nothing is overwritten.
+- The data repo holds the full history of `habits.json`. Clone it to back everything up.
+- The file format is documented in `shared/doc.js`.
 
-## How Sync Works
+## Development
 
-- By default, all habits are stored locally and work offline.
-- When you log in (via the call to action button), your local habits are synced to Supabase and available on all devices.
-- Any changes (including categories, order, completions) are automatically pushed to the cloud when logged in.
-
-## Getting Started
-
-### Prerequisites
-- Node.js (v18 or newer recommended)
-- npm
-
-### Installation
-```powershell
-# Clone the repository
-git clone https://github.com/nagaoo0/habitgrid.git
-cd habitgrid
-
-# Install dependencies
+```bash
 npm install
-```
-
-### Development
-```powershell
-npm run dev
-```
-Visit [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Build for Production
-```powershell
+npm run dev      # app on http://localhost:3000 (sync and reminders need Vercel or `vercel dev`)
+npm test         # merge, reminder and sync-route tests
 npm run build
 ```
-The production build will be in the `dist` folder.
 
-## Project Structure
-```
-src/
-  App.jsx
-  main.jsx
-  index.css
-  components/
-  lib/
-  pages/
-```
+## Notes and limits
 
-
-## Cloud Sync Setup
-
-To enable cross-device sync, you need a free [Supabase](https://supabase.com/) account:
-
-1. Create a Supabase project and set up a `habits` table with the following schema:
-   ```sql
-   create table habits (
-     id uuid primary key default gen_random_uuid(),
-     user_id uuid not null,
-     name text not null,
-     color text,
-     category text,
-     completions jsonb default '[]'::jsonb,
-     current_streak int default 0,
-     longest_streak int default 0,
-     sort_order int default 0,
-     created_at timestamptz default now(),
-     updated_at timestamptz default now()
-   );
-   ```
-2. Add your Supabase project URL and anon key to the app's environment/config.
-3. Deploy as usual (see below).
-
-You can easily deploy your own instance of HabitGrid using [Cloudflare Pages](https://pages.cloudflare.com/):
-
-1. Fork or clone this repository to your GitHub account.
-2. Go to Cloudflare Pages and create a new project, connecting your GitHub repo.
-3. Use the **Vite** preset when prompted for the build configuration.
-4. Set the build command to:
-   ```sh
-   npm run build
-   ```
-   and the output directory to:
-   ```sh
-   dist
-   ```
-5. Deploy and enjoy your own habit tracker online!
-
-
-## Offline-First Guarantee
-
-- You can use HabitGrid without ever logging in everything works locally.
-- If you decide to log in later, all your local habits (including categories and order) will be synced to the cloud and available on all devices.
-
----
-
-**Project Links:**
-
-- [Live Demo](https://myhabitgrid.com/)
-- [GitHub](https://github.com/nagaoo0/HabitGrid)
-- [Mirror (Gitea)](https://git.mihajlociric.com/count0/HabitGrid)
-
----
-
-*Built with ❤️ by [Mihajlo Ciric](https://mihajlociric.com/)*
+- Reminders are Web Push. They arrive on Android Chrome and desktop Chrome/Edge. On iPhone they need the app installed to the home screen (iOS 16.4+).
+- Reminders run on a 15-minute schedule, so a notification can arrive up to 15 minutes after its time.
+- The sync token is stored in the browser on each device. Anyone with it can read and change your habits, so keep it private.
+- The app code is MIT licensed (see `LICENSE`). Your habit data never goes into this repo.
