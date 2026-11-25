@@ -104,6 +104,7 @@ test('reports GitHub status when GitHub keeps failing', async () => {
   flakyNext = 10;
   const res = fakeRes();
   await handler(req('GET'), res);
-  assert.equal(res.statusCode, 503);
-  assert.match(res.body.error, /temporarily unavailable \(last status: 503\)/);
+  assert.equal(res.statusCode, 500);
+  assert.match(res.body.error, /will sync automatically/);
+  assert.doesNotMatch(res.body.error, /\d{3}/);
 });

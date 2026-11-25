@@ -25,6 +25,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, PUT');
     return res.status(405).json({ error: 'method not allowed' });
   } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message });
+    console.error('sync failed:', err.message);
+    return res.status(500).json({ error: 'Sync did not complete. Your changes are saved on this device and will sync automatically.' });
   }
 }

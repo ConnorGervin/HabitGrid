@@ -49,6 +49,7 @@ export async function syncNow() {
   }
 
   inFlight = true;
+  let tokenRejected = false;
   setStatus('syncing', 'Syncing…');
   try {
     const res = await fetch('/api/data', {
@@ -56,11 +57,11 @@ export async function syncNow() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(getDoc()),
     });
-    if (res.status === 401) throw new Error('Sync token was rejected – check it in Settings');
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `Server error ${res.status}`);
+    if (res.status === 401) {
+      tokenRejected = true;
+      throw new Error('Sync token was rejected – check it in Settings');
     }
+    if (!res.ok) throw new Error('Sync did not complete. Your changes are saved on this device and will sync automatically.');
     mergeRemote(await res.json());
     saveSettings({ lastSyncedAt: new Date().toISOString() });
     setStatus('synced', 'All changes synced');
@@ -68,7 +69,7 @@ export async function syncNow() {
     const offline = !navigator.onLine || err instanceof TypeError;
     setStatus(offline ? 'offline' : 'error', offline ? 'Offline – changes will sync later' : err.message);
     // Server-side hiccups (5xx) are usually temporary: try again shortly. Changes stay saved locally.
-    if (!offline && !/token|Server error 4/.test(err.message)) {
+    if (!offline && !tokenRejected) {
       clearTimeout(timer);
       timer = setTimeout(syncNow, 30000);
     }
