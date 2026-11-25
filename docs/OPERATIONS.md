@@ -37,7 +37,7 @@ Values are not in this repo. They live in the places listed below.
 | `VAPID_PRIVATE_KEY` | Vercel env | signs push messages | regenerate with `npx web-push generate-vapid-keys`, update both VAPID vars, redeploy, re-enable reminders |
 | `VAPID_SUBJECT` | Vercel env | `mailto:` contact for push services | change if the contact changes |
 
-Local copy: `.env.secrets (in the project folder)` in the sandbox where the values were generated (mode 600, outside the repo). The sandbox is not durable, so copy the values into a password manager.
+Local copy: `.env.secrets (in the project folder)` in the sandbox where the values were generated (mode 600, git-ignored). The sandbox is not durable, so copy the values into a password manager.
 
 `.env*` is git-ignored, so secrets files are not committed.
 
