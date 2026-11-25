@@ -10,6 +10,8 @@ A simple weekly habit grid. Habits are rows, days are columns. Tick a box, move 
 
 Forked from [nagaoo0/HabitGrid](https://github.com/nagaoo0/HabitGrid) and rebuilt around a single JSON document. The Supabase and Git-integration code has been removed.
 
+> **Live setup, projects and secret locations:** see [docs/OPERATIONS.md](docs/OPERATIONS.md). It lists names and locations only, never values.
+
 ## How it fits together
 
 ```
