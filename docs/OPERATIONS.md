@@ -53,7 +53,7 @@ Local copy: `.env.secrets (in the project folder)` in the sandbox where the valu
 
 1. Rotate `GITHUB_TOKEN`.
 2. Create the cron-job.org job above.
-3. Revoke the "Protection Bypass for Automation" secret on the Vercel project. It was created by the `vercel curl` check and is not needed. Command: `vercel project protection disable prj_TQeGV7eZWRS1OhY7LdjQbvpjnNwQ --protection-bypass --protection-bypass-secret <secret>`, or use the Vercel dashboard under Deployment Protection.
+3. ~~Revoke the "Protection Bypass for Automation" secret~~ **Done.** It was created by a `vercel curl` check and has been revoked.
 4. Connect GitHub auto-deploy (install the Vercel GitHub app on the fork).
 5. Open each device, paste `SYNC_TOKEN` into Settings, and enable reminders if wanted.
 6. Decide whether `habitgrid-pwa-rebuild` should become the default branch.
