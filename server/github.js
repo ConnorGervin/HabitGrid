@@ -26,7 +26,7 @@ const GENERIC_FAILURE = 'Could not reach your data store. Your changes are saved
 
 // Retries any failed call, with backoff. 404 (no file yet), 409/422 (stale copy, handled by the
 // caller) and 401 (bad credentials) are answers rather than failures, so they are returned as-is.
-async function fetchWithRetry(url, options, attempts = 4) {
+async function fetchWithRetry(url, options, attempts = 7) {
   let lastError;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -37,7 +37,8 @@ async function fetchWithRetry(url, options, attempts = 4) {
       lastError = err.message;
     }
     console.error('GitHub call failed, retrying:', lastError);
-    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 500 * 2 ** i));
+    // Backoff with jitter: 0.5s, 1s, 2s, 4s, 4s, 4s (about 15s in total).
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, Math.min(4000, 500 * 2 ** i) * (0.8 + Math.random() * 0.4)));
   }
   throw httpError(500, GENERIC_FAILURE);
 }

@@ -19,7 +19,7 @@ async function api(path, method, body) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Reminder server error ${res.status}`);
+  if (!res.ok) throw new Error('Could not update reminders. Please try again in a moment.');
 }
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
