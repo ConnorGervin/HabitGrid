@@ -23,11 +23,27 @@ const headers = (token) => ({
   'User-Agent': 'habitgrid',
 });
 
+// Retries transient GitHub failures (5xx, 429, network errors) with short backoff.
+async function fetchWithRetry(url, options, attempts = 3) {
+  let lastStatus = 'network error';
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, options);
+      if (res.status < 500 && res.status !== 429) return res;
+      lastStatus = res.status;
+    } catch (err) {
+      lastStatus = err.message;
+    }
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 300 * 2 ** i));
+  }
+  throw httpError(503, `GitHub unavailable after ${attempts} tries (${lastStatus})`);
+}
+
 export async function readJson(path, fallback) {
   const { repo, token } = config();
-  const res = await fetch(`${API}/repos/${repo}/contents/${path}`, { headers: headers(token) });
+  const res = await fetchWithRetry(`${API}/repos/${repo}/contents/${path}`, { headers: headers(token) });
   if (res.status === 404) return { data: structuredClone(fallback), sha: null };
-  if (!res.ok) throw httpError(502, `GitHub read ${path} failed: ${res.status}`);
+  if (!res.ok) throw httpError(502, `GitHub read ${path} failed: HTTP ${res.status}`);
   const file = await res.json();
   const text = Buffer.from(file.content, 'base64').toString('utf8');
   return { data: JSON.parse(text), sha: file.sha };
@@ -40,13 +56,13 @@ async function writeJson(path, data, sha, message) {
     content: Buffer.from(JSON.stringify(data, null, 2) + '\n', 'utf8').toString('base64'),
     ...(sha ? { sha } : {}),
   };
-  const res = await fetch(`${API}/repos/${repo}/contents/${path}`, {
+  const res = await fetchWithRetry(`${API}/repos/${repo}/contents/${path}`, {
     method: 'PUT',
     headers: { ...headers(token), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (res.status === 409 || res.status === 422) return false; // stale sha: caller retries
-  if (!res.ok) throw httpError(502, `GitHub write ${path} failed: ${res.status}`);
+  if (!res.ok) throw httpError(502, `GitHub write ${path} failed: HTTP ${res.status}`);
   return true;
 }
 

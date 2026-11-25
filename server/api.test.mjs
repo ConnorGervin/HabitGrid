@@ -2,9 +2,9 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 // In-memory stand-in for the GitHub Contents API.
-let files, writes, conflictNext, realFetch;
+let files, writes, conflictNext, flakyNext, realFetch;
 beforeEach(() => {
-  files = {}; writes = 0; conflictNext = 0;
+  files = {}; writes = 0; conflictNext = 0; flakyNext = 0;
   process.env.GITHUB_DATA_REPO = 'me/data';
   process.env.GITHUB_TOKEN = 'gh';
   process.env.SYNC_TOKEN = 'sync-secret';
@@ -12,6 +12,7 @@ beforeEach(() => {
   globalThis.fetch = async (url, opts = {}) => {
     const path = new URL(url).pathname.replace('/repos/me/data/contents/', '');
     const method = opts.method || 'GET';
+    if (flakyNext > 0) { flakyNext--; return new Response('unavailable', { status: 503 }); }
     if (method === 'GET') {
       if (!files[path]) return new Response('{}', { status: 404 });
       return Response.json({ sha: files[path].sha, content: Buffer.from(files[path].text).toString('base64') });
@@ -88,4 +89,21 @@ test('unchanged data is not committed again', async () => {
   const before = writes;
   await handler(req('PUT', doc), fakeRes());
   assert.equal(writes, before);
+});
+
+test('retries a transient GitHub 503 and still succeeds', async () => {
+  const { default: handler } = await import('../api/data.js');
+  flakyNext = 1;
+  const res = fakeRes();
+  await handler(req('GET'), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('reports GitHub status when GitHub keeps failing', async () => {
+  const { default: handler } = await import('../api/data.js');
+  flakyNext = 10;
+  const res = fakeRes();
+  await handler(req('GET'), res);
+  assert.equal(res.statusCode, 503);
+  assert.match(res.body.error, /GitHub unavailable.*503/);
 });

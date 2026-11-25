@@ -64,6 +64,11 @@ export async function syncNow() {
   } catch (err) {
     const offline = !navigator.onLine || err instanceof TypeError;
     setStatus(offline ? 'offline' : 'error', offline ? 'Offline – changes will sync later' : err.message);
+    // Server-side hiccups (5xx) are usually temporary: try again shortly. Changes stay saved locally.
+    if (!offline && !/token|Server error 4/.test(err.message)) {
+      clearTimeout(timer);
+      timer = setTimeout(syncNow, 30000);
+    }
   } finally {
     inFlight = false;
     if (queued) {
